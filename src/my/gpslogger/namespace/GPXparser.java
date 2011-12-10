@@ -5,6 +5,9 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+/*
+ * Kann erweitert werden, und wäre schön wenn er denn auch benutzt würde :)
+ */
 
 
 public class GPXparser {

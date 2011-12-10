@@ -15,7 +15,6 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -30,50 +29,79 @@ public class GPSLoggerActivity extends Activity {
 	Button bat;// = (Button) this.findViewById(R.id.button);
 	FileOutputStream fOut;
 	BufferedOutputStream bOut;
+	LocationManager lm;
+	boolean write = false;
 	/** Called when the activity is first created. */
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);    
+		lm = (LocationManager)getSystemService(Context.LOCATION_SERVICE); // initialize the manager
 		tv_longitude = this.findViewById(R.id.longitude);
 		tv_latitude = this.findViewById(R.id.latitude);
+		tv_altitude = this.findViewById(R.id.altitude);
 		status = (TextView) this.findViewById(R.id.status);
 		target = (EditText) this.findViewById(R.id.editText1);
 		((TextView)status).setText("debugmode");
-		
-	}
-
-	void printSaveLocation(Location l) {
-		((TextView) tv_longitude).setText(String.valueOf(l.getLatitude()));
-		((TextView) tv_latitude).setText(String.valueOf(l.getLongitude()));
-		((TextView) tv_altitude).setText(String.valueOf(l.getAltitude()));
-		//l.getAltitude();
 		try {
-			bOut.write(("<trkpt lat=\""+String.valueOf(l.getLatitude())+"\" lon=\""+String.valueOf(l.getLongitude())+"\"></trkpt>"+"\n").getBytes());
-			bOut.flush();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			lm.requestLocationUpdates("gps", 600, 1, locationListener); //was 60000
+		} catch (Exception e) {
 			e.printStackTrace();
+		}
+		Location l = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+		if (l != null) {
+			printSaveLocation(l,false);
 		}
 	}
 
+	void printSaveLocation(Location l, boolean write) {
+		((TextView) tv_longitude).setText("Lon: "+String.valueOf(l.getLatitude()));
+		((TextView) tv_latitude).setText("Lat: "+String.valueOf(l.getLongitude()));
+		((TextView) tv_altitude).setText("Alt: "+String.valueOf(l.getAltitude()));
+		//l.getAltitude();
+		if(write){
+			try {
+				bOut.write(("\t"+"\t"+"<trkpt lat=\""+String.valueOf(l.getLatitude())+"\" lon=\""+String.valueOf(l.getLongitude())+"\" alt=\""+String.valueOf(l.getAltitude())+"\"></trkpt>"+"\n").getBytes());
+				bOut.flush();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+	void printProlog(){
+		descr = (EditText)this.findViewById(R.id.editText2);
+		status = (TextView)this.findViewById(R.id.status);
+		((TextView)status).setText("PrologWritten!");
+		try {
+			bOut.write(("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\" ?>"+"\n").getBytes());
+			bOut.write(("<gpx creator=\"@Author\" description=\""+descr.getText()+"\" version=\"alpha\">"+"\n").getBytes());
+			bOut.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+	}
+	
 	private final LocationListener locationListener = new LocationListener() {
 		public void onLocationChanged(Location l) {
-			printSaveLocation(l);
+			printSaveLocation(l, write);
 		}
 
 		@Override
 		public void onProviderDisabled(String arg0) {
 			((TextView) tv_latitude).setText("ProviderDisabled");
 			((TextView) tv_longitude).setText("ProviderDisabled");
+			((TextView) tv_altitude).setText("ProviderDisabled");
 			// TODO Auto-generated method stub
 
 		}
 
 		@Override
 		public void onProviderEnabled(String arg0) {
-			//((TextView) tv_latitude).setText("ProviderEnabled");
-			//((TextView) tv_longitude).setText("ProviderEnabled");
+			((TextView) tv_latitude).setText("ProviderEnabled");
+			((TextView) tv_longitude).setText("ProviderEnabled");
+			((TextView) tv_altitude).setText("ProviderDisabled");
 			// TODO Auto-generated method stub
 
 		}
@@ -86,13 +114,14 @@ public class GPSLoggerActivity extends Activity {
 	};
 	boolean flicker = false;
 	public void myClickHandler(View view){
-		
-    	switch (view.getId()) {
+
+		switch (view.getId()) {
 		case R.id.button: // the exit button!
 			if(!flicker){break;} 
+			write = false; //show dont write
 			status = (TextView)this.findViewById(R.id.status);
 			try {
-				bOut.write(("</trkseq>"+"\n").getBytes());
+				bOut.write(("\t"+"</trkseq>"+"\n"+"</gpx>"+"\n").getBytes());
 				bOut.flush();
 				((TextView)status).setText("written!");
 			} catch (IOException e) {
@@ -114,14 +143,16 @@ public class GPSLoggerActivity extends Activity {
 			descr = (EditText)this.findViewById(R.id.editText2);
 			String outputfile = target.getText().toString();
 			((TextView)status).setText("running, no file created!");
-			LocationManager lm = (LocationManager)getSystemService(Context.LOCATION_SERVICE);   
+			//LocationManager lm = (LocationManager)getSystemService(Context.LOCATION_SERVICE);  
+			
 			try {
 				//((TextView)status).setText(Environment.getExternalStorageDirectory().toString());
 				File file = Environment.getExternalStorageDirectory();
 				File f = new File(file, outputfile+".gpx");
 				bOut = new BufferedOutputStream(new FileOutputStream(f));
 				//bOut = new BufferedOutputStream(openFileOutput(outputfile+".gpx", MODE_WORLD_READABLE));
-				bOut.write(("<trkseg>"+"\n").getBytes()); // mehr an prolog daten
+				printProlog();
+				bOut.write(("\t"+"<trkseg>"+"\n").getBytes()); // mehr an prolog daten
 				bOut.flush();
 				((TextView)status).setText("running");
 			} catch (FileNotFoundException e) {
@@ -130,21 +161,22 @@ public class GPSLoggerActivity extends Activity {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-			try {
-				lm.requestLocationUpdates("gps", 600, 1, locationListener); //was 60000
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-			Location l = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-			if (l != null) {
-				printSaveLocation(l);
-			}
+			write = true; // show & write
+//			try {
+//				lm.requestLocationUpdates("gps", 600, 1, locationListener); //was 60000
+//			} catch (Exception e) {
+//				e.printStackTrace();
+//			}
+//			Location l = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+//			if (l != null) {
+//				printSaveLocation(l,true);
+//			}
 			break;
 		default:
 			break;
 		}
-    }
-	
+	}
+
 	public void uglyfy(View view){
 		TextView tv = new TextView(this);
 		tv.setBackgroundColor(Color.GREEN);
