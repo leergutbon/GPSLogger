@@ -6,7 +6,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 /*
- * Kann erweitert werden, und wäre schön wenn er denn auch benutzt würde :)
+ * IN DEVELOPEMENT -- UNUSED
+ * As a future developement, this should be filled out
+ * it is not too good to keep the gpx output functions
+ * in the "main" Activity. There should only be handlers
+ * and external Objects.
  */
 
 
